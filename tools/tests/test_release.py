@@ -21,15 +21,13 @@ from utils import platform
 def allowed_platform(qp):
     if qp in ["all", "any"]:
         return True
-    if len(qp) == 0:
-        return True
-    return qp.find(platform()) >= 0
+    return True if len(qp) == 0 else qp.find(platform()) >= 0
 
 
 class ReleaseTests(test_base.QueryTester):
     def test_pack_queries(self):
         packs = {}
-        PACKS_DIR = SOURCE_DIR + "/packs"
+        PACKS_DIR = f"{SOURCE_DIR}/packs"
         for root, dirs, files in os.walk(PACKS_DIR):
             for name in files:
                 with open(os.path.join(PACKS_DIR, name), 'r') as fh:
@@ -49,28 +47,20 @@ class ReleaseTests(test_base.QueryTester):
             self._execute_set(queries)
 
     def test_no_avx_instructions(self):
-        if platform() == "darwin":
-            tool = "otool -tV"
-        else:
-            tool = "objdump -d"
-        proc = subprocess.call(
-            "%s %s | grep vxorps" % (tool, self.binary), shell=True)
+        tool = "otool -tV" if platform() == "darwin" else "objdump -d"
+        proc = subprocess.call(f"{tool} {self.binary} | grep vxorps", shell=True)
         # Require no AVX instructions
         self.assertEqual(proc, 1)
 
     def test_no_local_link(self):
-        if platform() == "darwin":
-            tool = "otool -L"
-        else:
-            tool = "ldd"
-        proc = subprocess.call(
-            "%s %s | grep /usr/local/" % (tool, self.binary), shell=True)
+        tool = "otool -L" if platform() == "darwin" else "ldd"
+        proc = subprocess.call(f"{tool} {self.binary} | grep /usr/local/", shell=True)
         # Require no local dynamic dependent links.
         self.assertEqual(proc, 1)
 
 if __name__ == '__main__':
     SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
-    SOURCE_DIR = os.path.abspath(SCRIPT_DIR + "/../../")
+    SOURCE_DIR = os.path.abspath(f"{SCRIPT_DIR}/../../")
 
     module = test_base.Tester()
     # Find and import the thrift-generated python interface

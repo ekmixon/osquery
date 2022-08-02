@@ -46,4 +46,3 @@ if __name__ == "__main__":
         if file['file'].find("gtest") > 0:
             continue
         print(file['file'])
-        pass

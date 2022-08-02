@@ -20,7 +20,7 @@ except ImportError:
     exit(1)
 
 # Import the testing utils
-sys.path.append(os.path.dirname(os.path.realpath(__file__)) + "/../tests/")
+sys.path.append(f"{os.path.dirname(os.path.realpath(__file__))}/../tests/")
 
 import utils
 
@@ -37,7 +37,7 @@ RANGES = {
 
 def check_leaks_linux(shell, query, count=1, supp_file=None):
     """Run valgrind using the shell and a query, parse leak reports."""
-    suppressions = "" if supp_file is None else "--suppressions=%s" % supp_file
+    suppressions = "" if supp_file is None else f"--suppressions={supp_file}"
     cmd = [
         "valgrind",
         "--tool=memcheck",
@@ -77,9 +77,11 @@ def check_leaks_darwin(shell, query, count=1):
     while proc.poll() is None:
         # Continue to run leaks until the monitored shell exits.
         leaks = subprocess.Popen(
-            ["leaks", "%s" % proc.pid],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            ["leaks", f"{proc.pid}"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
+
         stdout, _ = leaks.communicate()
         if args.verbose:
             print(stdout)
@@ -103,7 +105,7 @@ def check_leaks(shell, query, count=1, supp_file=None):
 def profile_leaks(shell, queries, count=1, rounds=1, supp_file=None):
     report = {}
     for name, query in queries.items():
-        print("Analyzing leaks in query: %s" % query)
+        print(f"Analyzing leaks in query: {query}")
         # Apply count (optionally run the query several times).
         summary = check_leaks(shell, query, count, supp_file)
         display = []
@@ -119,8 +121,8 @@ def profile_leaks(shell, queries, count=1, rounds=1, supp_file=None):
                     report[name] = "WARNING"
             elif name not in report.keys():
                 report[name] = "SAFE"
-            display.append("%s: %s" % (key, output))
-        print("  %s" % "; ".join(display))
+            display.append(f"{key}: {output}")
+        print(f'  {"; ".join(display)}')
     return report
 
 
@@ -141,14 +143,11 @@ def run_query(shell, query, timeout=0, count=1):
 def summary_line(name, result):
     if not args.n:
         for key, v in result.items():
-            print("%s" % (
-                RANGES["colors"][v[0]]("%s:%s" % (
-                    key[0].upper(), v[0]))),
-                  end="")
+            print(("%s" % RANGES["colors"][v[0]](f"{key[0].upper()}:{v[0]}")), end="")
         print(" ", end="")
-    print("%s:" % name, end=" ")
+    print(f"{name}:", end=" ")
     for key, v in result.items():
-        print("%s: %s" % (key, v[1]), end=" ")
+        print(f"{key}: {v[1]}", end=" ")
     print("")
 
 
@@ -183,9 +182,9 @@ def summary(results, display=False):
 def profile(shell, queries, timeout=0, count=1, rounds=1):
     report = {}
     for name, query in queries.items():
-        forced = True if name == "force" else False
+        forced = name == "force"
         if not forced:
-            print("Profiling query: %s" % query)
+            print(f"Profiling query: {query}")
         results = {}
         for i in range(rounds):
             if forced:
@@ -199,12 +198,10 @@ def profile(shell, queries, timeout=0, count=1, rounds=1):
             for k, v in result.items():
                 results[k] = results.get(k, [])
                 results[k].append(v)
-        average_results = {}
-        for k in results:
-            average_results[k] = sum(results[k]) / len(results[k])
+        average_results = {k: sum(results[k]) / len(results[k]) for k in results}
         report[name] = average_results
         if rounds > 1:
-            summary({"%s   avg" % name: report[name]}, display=True)
+            summary({f"{name}   avg": report[name]}, display=True)
     return report
 
 
@@ -225,8 +222,10 @@ def regress_check(profile1, profile2):
             continue
         for measure in profile1[table]:
             if profile2[table][measure][0] > profile1[table][measure][0]:
-                print("%s %s has regressed (%s->%s)!" % (table, measure,
-                                                         profile1[table][measure][0], profile2[table][measure][0]))
+                print(
+                    f"{table} {measure} has regressed ({profile1[table][measure][0]}->{profile2[table][measure][0]})!"
+                )
+
                 regressed = True
     if not regressed:
         print("No regressions!")
@@ -323,23 +322,27 @@ if __name__ == "__main__":
             profile1 = json.loads(fh.read())
 
     if not args.force and not os.path.exists(args.shell):
-        print("Cannot find --shell: %s" % (args.shell))
+        print(f"Cannot find --shell: {args.shell}")
         exit(1)
     if args.config is None and not os.path.exists(args.tables):
-        print("Cannot find --tables: %s" % (args.tables))
+        print(f"Cannot find --tables: {args.tables}")
         exit(1)
 
     queries = {}
     if args.config is not None:
         if not os.path.exists(args.config):
-            print("Cannot find --config: %s" % (args.config))
+            print(f"Cannot find --config: {args.config}")
             exit(1)
         queries = utils.queries_from_config(args.config)
         # Search queries in subdirectory ".d" based on the config filename
-        if os.path.isdir(args.config + ".d"):
-            for config_file in os.listdir(args.config + ".d"):
-                queries.update(utils.queries_from_config(os.path.join(
-                    args.config + ".d", config_file)))
+        if os.path.isdir(f"{args.config}.d"):
+            for config_file in os.listdir(f"{args.config}.d"):
+                queries.update(
+                    utils.queries_from_config(
+                        os.path.join(f"{args.config}.d", config_file)
+                    )
+                )
+
     elif args.query is not None:
         queries["manual"] = args.query
     elif args.force:
@@ -370,7 +373,7 @@ if __name__ == "__main__":
                 fh.write(json.dumps(results, indent=1))
             else:
                 fh.write(json.dumps(summary(results), indent=1))
-        print("Wrote output summary: %s" % args.output)
+        print(f"Wrote output summary: {args.output}")
 
     if args.leaks:
         for name in results.keys():

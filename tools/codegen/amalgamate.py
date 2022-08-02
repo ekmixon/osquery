@@ -30,9 +30,7 @@ def genTableData(filename):
             begin_table = False
         elif begin_table:
             table_data.append(line)
-    if len(table_data) == 0:
-        return None
-    return "\n".join(table_data)
+    return "\n".join(table_data) if table_data else None
 
 
 def main(argc, argv):

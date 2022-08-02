@@ -79,7 +79,7 @@ def queries_from_config(config_path):
             content = rmcomment.sub('',configcontent)
             config = json.loads(content)
     except Exception as e:
-        print("Cannot open/parse config: %s" % str(e))
+        print(f"Cannot open/parse config: {str(e)}")
         exit(1)
     queries = {}
     if "schedule" in config:
@@ -90,14 +90,14 @@ def queries_from_config(config_path):
             # Check if it is an internal pack definition
             if type(values) is dict:
                 for queryname, query in values["queries"].items():
-                    queries["pack_" + queryname] = query["query"]
+                    queries[f"pack_{queryname}"] = query["query"]
             else:
                 with open(values) as fp:
                     packfile = fp.read()
                     packcontent = rmcomment.sub('', packfile)
                     packqueries = json.loads(packcontent)
                     for queryname, query in packqueries["queries"].items():
-                        queries["pack_" + queryname] = query["query"]
+                        queries[f"pack_{queryname}"] = query["query"]
 
     return queries
 
@@ -117,14 +117,11 @@ def queries_from_tables(path, restrict):
             if spec_platform not in ["specs", "posix", platform()]:
                 continue
             # Generate all tables to select from, with abandon.
-            tables.append("%s.%s" % (spec_platform, table_name))
+            tables.append(f"{spec_platform}.{table_name}")
 
     if len(restrict) > 0:
         tables = [t for t in tables if t.split(".")[1] in restrict_tables]
-    queries = {}
-    for table in tables:
-        queries[table] = "SELECT * FROM %s;" % table.split(".", 1)[1]
-    return queries
+    return {table: f'SELECT * FROM {table.split(".", 1)[1]};' for table in tables}
 
 
 def get_stats(p, interval=1):
@@ -178,11 +175,7 @@ def profile_cmd(cmd, proc=None, shell=False, timeout=0, count=1):
     duration = max(duration, 0)
 
     utilization = [percent for percent in percents if percent != 0]
-    if len(utilization) == 0:
-        avg_utilization = 0
-    else:
-        avg_utilization = sum(utilization) / len(utilization)
-
+    avg_utilization = sum(utilization) / len(utilization) if utilization else 0
     if len(stats.keys()) == 0:
         raise Exception("No stats recorded, perhaps binary returns -1?")
     rval = {

@@ -73,12 +73,11 @@ class Encoder(json.JSONEncoder):
         self._replacement_map = {}
 
     def default(self, o):
-        if isinstance(o, NoIndent):
-            key = uuid.uuid4().hex
-            self._replacement_map[key] = json.dumps(o.value, **self.kwargs)
-            return "@@%s@@" % (key,)
-        else:
+        if not isinstance(o, NoIndent):
             return super(Encoder, self).default(o)
+        key = uuid.uuid4().hex
+        self._replacement_map[key] = json.dumps(o.value, **self.kwargs)
+        return f"@@{key}@@"
 
     def encode(self, o):
         result = super(Encoder, self).encode(o)
@@ -129,10 +128,10 @@ def gen_diff(api_old_path, api_new_path):
     new_tables = {}
     for category in api_new["tables"]:
         for table in category["tables"]:
-            new_tables["%s:%s" % (category["name"], table["name"])] = table
+            new_tables[f'{category["name"]}:{table["name"]}'] = table
     for category in api_old["tables"]:
         for table in category["tables"]:
-            old_tables["%s:%s" % (category["name"], table["name"])] = table
+            old_tables[f'{category["name"]}:{table["name"]}'] = table
 
     # Iterate backwards then forward to detect added/removed.
     tables_added = []
@@ -146,8 +145,10 @@ def gen_diff(api_old_path, api_new_path):
         for column in table["columns"]:
             old_columns = [c["name"] for c in old_tables[name]["columns"]]
             if column["name"] not in old_columns:
-                columns_added.append("%s:%s:%s:%s" % (category["name"],
-                                                      table["name"], column["name"], column["type"]))
+                columns_added.append(
+                    f'{category["name"]}:{table["name"]}:{column["name"]}:{column["type"]}'
+                )
+
 
     for name, table in old_tables.items():
         if name not in new_tables:
@@ -156,8 +157,10 @@ def gen_diff(api_old_path, api_new_path):
         for column in table["columns"]:
             new_columns = [c["name"] for c in new_tables[name]["columns"]]
             if column["name"] not in new_columns:
-                columns_removed.append("%s:%s:%s:%s" % (category["name"],
-                                                        table["name"], column["name"], column["type"]))
+                columns_removed.append(
+                    f'{category["name"]}:{table["name"]}:{column["name"]}:{column["type"]}'
+                )
+
 
     # Sort then pretty print (md) the changes.
     tables_added.sort()
@@ -166,16 +169,14 @@ def gen_diff(api_old_path, api_new_path):
     columns_added.sort()
     for name in columns_added:
         column = name.split(":")
-        print("Added column `%s` (`%s`) to table `%s`" % (column[2], column[3],
-                                                          column[1]))
+        print(f"Added column `{column[2]}` (`{column[3]}`) to table `{column[1]}`")
     tables_removed.sort()
     for name in tables_removed:
         print("Removed table `%s` from %s" % tuple(name.split(":")[::-1]))
     columns_removed.sort()
     for name in columns_removed:
         column = name.split(":")
-        print("Removed column `%s` (`%s`) from table `%s`" % (column[2],
-                                                              column[3], column[1]))
+        print(f"Removed column `{column[2]}` (`{column[3]}`) from table `{column[1]}`")
 
 
 def gen_api(tables_path, profile={}):
@@ -191,7 +192,7 @@ def gen_api(tables_path, profile={}):
             if spec_file[0] == '.' or spec_file.find("example") == 0:
                 continue
             # Exclude denylist specific file
-            if spec_file == 'denylist' or spec_file == 'CMakeLists.txt':
+            if spec_file in ['denylist', 'CMakeLists.txt']:
                 continue
             platform = os.path.basename(base)
             # Exclude kernel tables
@@ -204,7 +205,7 @@ def gen_api(tables_path, profile={}):
             with open(os.path.join(base, spec_file), "r") as fh:
                 tree = ast.parse(fh.read())
                 table_spec = gen_spec(tree)
-                table_profile = profile.get("%s.%s" % (platform, name), {})
+                table_profile = profile.get(f"{platform}.{name}", {})
                 table_spec["profile"] = NoIndent(table_profile)
                 table_spec["denylisted"] = is_denylisted(table_spec["name"], path=spec_file,
                                                            denylist=denylist)
@@ -256,19 +257,19 @@ def main(argc, argv):
         exit(0)
 
     if not os.path.exists(args.tables):
-        logging.error("Cannot find path: %s" % (args.tables))
+        logging.error(f"Cannot find path: {args.tables}")
         exit(1)
 
     profile = {}
     if args.profile is not None:
         if not os.path.exists(args.profile):
-            logging.error("Cannot find path: %s" % (args.profile))
+            logging.error(f"Cannot find path: {args.profile}")
             exit(1)
         with open(args.profile, "r") as fh:
             try:
                 profile = json.loads(fh.read())
             except Exception as e:
-                logging.error("Cannot parse profile data: %s" % (str(e)))
+                logging.error(f"Cannot parse profile data: {str(e)}")
                 exit(2)
 
     # Read in the optional list of denylisted tables, then generate
@@ -287,11 +288,11 @@ def main(argc, argv):
         if args.directory[-1:] == '/':
             output_path = args.directory + output_file
         else:
-            output_path = args.directory + '/' + output_file
+            output_path = f'{args.directory}/{output_file}'
 
         with open(output_path, 'w') as f:
             print(gen_api_json(api), file=f)
-        print('[+] tables json file created at %s' % (output_path))
+        print(f'[+] tables json file created at {output_path}')
     else:
         print(gen_api_json(api))
 

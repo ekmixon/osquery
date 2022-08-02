@@ -69,7 +69,7 @@ class Templite(object):
 
     def _compile(self, source):
         offset = 0
-        tokens = ['# -*- coding: %s -*-' % self.encoding]
+        tokens = [f'# -*- coding: {self.encoding} -*-']
         start, end = self.delimiters
         escaped = (re.escape(start), re.escape(end))
         regex = re.compile('%s(.*?)%s' % escaped, re.DOTALL)
@@ -91,7 +91,7 @@ class Templite(object):
                     part = part_stripped[1:]
                     if not part.endswith(':'): continue
                 elif self.autowrite.match(part_stripped):
-                    part = 'write(%s)' % part_stripped
+                    part = f'write({part_stripped})'
                 lines = part.splitlines()
                 margin = min(len(l) - len(l.lstrip()) for l in lines if l.strip())
                 part = '\n'.join('\t' * offset + l[margin:] for l in lines)
